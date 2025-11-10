@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\City;
 use App\Models\County;
 use App\Models\PostalCode;
 use Illuminate\Console\Command;
@@ -10,79 +9,94 @@ use Illuminate\Support\Facades\DB;
 
 class ImportPostalCodes extends Command
 {
-    protected $signature = 'postal:import {file}';
-    protected $description = 'Import postal codes from CSV file';
+    protected $signature = 'postal:import';
+    protected $description = 'Import counties and postal codes from CSV files';
 
     public function handle()
     {
-        $filePath = $this->argument('file');
-
-        if (!file_exists($filePath)) {
-            $this->error("File not found: {$filePath}");
-            return 1;
-        }
-
         $this->info('Starting import...');
 
         DB::beginTransaction();
 
         try {
-            $file = fopen($filePath, 'r');
-            $header = fgetcsv($file, 0, ';');
+            // 1. Megyék importálása
+            $this->info('Importing counties...');
+            $countiesFile = base_path('counties.csv');
             
-            $countyCache = [];
-            $cityCache = [];
+            if (!file_exists($countiesFile)) {
+                $this->error("Counties file not found: {$countiesFile}");
+                return 1;
+            }
+
+            $counties = [];
+            $countyId = 1;
+            $file = fopen($countiesFile, 'r');
+            
+            while (($line = fgets($file)) !== false) {
+                $countyName = trim($line);
+                if (empty($countyName)) continue;
+                
+                if (!isset($counties[$countyName])) {
+                    County::create([
+                        'id' => $countyId,
+                        'name' => $countyName
+                    ]);
+                    $counties[$countyName] = $countyId;
+                    $countyId++;
+                }
+            }
+            fclose($file);
+            
+            $this->info("Imported " . count($counties) . " counties");
+
+            // 2. Irányítószámok importálása
+            $this->info('Importing postal codes...');
+            $postalCodesFile = base_path('postalcodes.csv');
+            
+            if (!file_exists($postalCodesFile)) {
+                $this->error("Postal codes file not found: {$postalCodesFile}");
+                return 1;
+            }
+
             $imported = 0;
             $skipped = 0;
-
+            $file = fopen($postalCodesFile, 'r');
+            
             while (($row = fgetcsv($file, 0, ';')) !== false) {
-                if (empty($row[0]) || empty($row[1]) || empty($row[2])) {
-                    continue;
-                }
-
-                $postalCode = trim($row[0]);
-                $cityName = trim($row[1]);
-                $countyName = trim($row[2]);
-
-                if ($postalCode === 'Postal Code' || !is_numeric($postalCode)) {
-                    continue;
-                }
-
-                if (!isset($countyCache[$countyName])) {
-                    $county = County::firstOrCreate(['name' => $countyName]);
-                    $countyCache[$countyName] = $county->id;
-                }
-
-                $cacheKey = "{$cityName}_{$countyCache[$countyName]}";
-                if (!isset($cityCache[$cacheKey])) {
-                    $city = City::firstOrCreate([
-                        'name' => $cityName,
-                        'county_id' => $countyCache[$countyName]
-                    ]);
-                    $cityCache[$cacheKey] = $city->id;
-                }
-
+                if (count($row) < 3) continue;
+                
+                $code = trim($row[0]);
+                $settlement = trim($row[1]);
+                $countyIdStr = trim($row[2]);
+                
+                if (empty($code) || empty($settlement)) continue;
+                
+                // County ID konverzió (ha van)
+                $countyId = !empty($countyIdStr) ? (int)$countyIdStr : null;
+                
                 try {
                     PostalCode::create([
-                        'code' => $postalCode,
-                        'city_id' => $cityCache[$cacheKey]
+                        'code' => $code,
+                        'settlement' => $settlement,
+                        'county_id' => $countyId
                     ]);
                     $imported++;
                 } catch (\Exception $e) {
                     $skipped++;
                 }
 
-                if ($imported % 100 === 0) {
+                if ($imported % 500 === 0) {
                     $this->info("Imported: {$imported}");
                 }
             }
-
             fclose($file);
+
             DB::commit();
 
-            $this->info("Import completed!");
-            $this->info("Total imported: {$imported}");
-            $this->info("Total skipped: {$skipped}");
+            $this->info("✓ Import completed!");
+            $this->info("Counties: " . count($counties));
+            $this->info("Postal codes imported: {$imported}");
+            $this->info("Postal codes skipped: {$skipped}");
 
             return 0;
 

@@ -10,12 +10,12 @@ class CountyController extends Controller
 {
     public function index()
     {
-        return County::withCount('cities')->paginate(20);
+        return County::withCount('postalCodes')->paginate(20);
     }
 
     public function show(County $county)
     {
-        return $county->load('cities');
+        return $county->load('postalCodes');
     }
 
     public function store(Request $request)

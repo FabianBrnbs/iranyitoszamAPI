@@ -12,8 +12,8 @@ class County extends Model
 
     protected $fillable = ['name'];
 
-    public function cities(): HasMany
+    public function postalCodes(): HasMany
     {
-        return $this->hasMany(City::class);
+        return $this->hasMany(PostalCode::class);
     }
 }

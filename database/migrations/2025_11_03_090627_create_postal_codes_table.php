@@ -10,12 +10,12 @@ return new class extends Migration
     {
         Schema::create('postal_codes', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 4);
-            $table->foreignId('city_id')->constrained()->onDelete('cascade');
+            $table->string('code', 4)->index();
+            $table->string('settlement'); // település neve
+            $table->foreignId('county_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();
             
-            $table->unique(['code', 'city_id']);
-            $table->index('code');
+            $table->unique(['code', 'settlement']);
         });
     }
 

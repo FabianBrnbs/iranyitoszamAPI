@@ -10,12 +10,12 @@ class PostalCode extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['code', 'city_id'];
+    protected $fillable = ['code', 'settlement', 'county_id'];
 
-    protected $with = ['city'];
+    protected $with = ['county'];
 
-    public function city(): BelongsTo
+    public function county(): BelongsTo
     {
-        return $this->belongsTo(City::class);
+        return $this->belongsTo(County::class);
     }
 }

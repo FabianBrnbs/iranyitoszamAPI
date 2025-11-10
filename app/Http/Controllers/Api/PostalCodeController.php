@@ -10,14 +10,18 @@ class PostalCodeController extends Controller
 {
     public function index(Request $request)
     {
-        $query = PostalCode::with('city.county');
+        $query = PostalCode::with('county');
 
         if ($request->has('code')) {
             $query->where('code', 'like', $request->code . '%');
         }
 
-        if ($request->has('city_id')) {
-            $query->where('city_id', $request->city_id);
+        if ($request->has('settlement')) {
+            $query->where('settlement', 'like', '%' . $request->settlement . '%');
+        }
+
+        if ($request->has('county_id')) {
+            $query->where('county_id', $request->county_id);
         }
 
         return $query->paginate(20);
@@ -25,29 +29,31 @@ class PostalCodeController extends Controller
 
     public function show(PostalCode $postalCode)
     {
-        return $postalCode->load('city.county');
+        return $postalCode->load('county');
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'code' => 'required|string|size:4',
-            'city_id' => 'required|exists:cities,id'
+            'settlement' => 'required|string|max:255',
+            'county_id' => 'nullable|exists:counties,id'
         ]);
 
         $postalCode = PostalCode::create($validated);
-        return response()->json($postalCode->load('city.county'), 201);
+        return response()->json($postalCode->load('county'), 201);
     }
 
     public function update(Request $request, PostalCode $postalCode)
     {
         $validated = $request->validate([
             'code' => 'required|string|size:4',
-            'city_id' => 'required|exists:cities,id'
+            'settlement' => 'required|string|max:255',
+            'county_id' => 'nullable|exists:counties,id'
         ]);
 
         $postalCode->update($validated);
-        return response()->json($postalCode->load('city.county'));
+        return response()->json($postalCode->load('county'));
     }
 
     public function destroy(PostalCode $postalCode)
@@ -58,14 +64,12 @@ class PostalCodeController extends Controller
 
     public function search(Request $request)
     {
-        $query = PostalCode::with('city.county');
+        $query = PostalCode::with('county');
 
         if ($request->has('q')) {
             $search = $request->q;
             $query->where('code', 'like', $search . '%')
-                ->orWhereHas('city', function($q) use ($search) {
-                    $q->where('name', 'like', '%' . $search . '%');
-                });
+                ->orWhere('settlement', 'like', '%' . $search . '%');
         }
 
         return $query->paginate(20);
